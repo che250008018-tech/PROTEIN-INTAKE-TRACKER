@@ -1,328 +1,73 @@
-// FORM / FUEL - Protein Tracker
-
-const $ = id => document.getElementById(id);
-const KEY = "proteinTrackStateV1";
-
-const foods = [
-  {id:"eggs",name:"Eggs",emoji:"🥚",unit:"eggs",protein:6},
-  {id:"chicken",name:"Chicken",emoji:"🍗",unit:"100 g",protein:31},
-  {id:"paneer",name:"Paneer",emoji:"🧀",unit:"100 g",protein:18},
-  {id:"dal",name:"Cooked dal",emoji:"🥣",unit:"cups",protein:9},
-  {id:"milk",name:"Milk",emoji:"🥛",unit:"cups",protein:8},
-  {id:"curd",name:"Curd",emoji:"🥣",unit:"100 g",protein:4},
-  {id:"tofu",name:"Tofu",emoji:"🧊",unit:"100 g",protein:8},
-  {id:"chickpeas",name:"Chickpeas",emoji:"🫘",unit:"cups",protein:15},
-  {id:"peanuts",name:"Peanuts",emoji:"🥜",unit:"30 g portions",protein:7},
-  {id:"oats",name:"Oats",emoji:"🌾",unit:"40 g portions",protein:5},
-  {id:"fish",name:"Fish",emoji:"🐟",unit:"100 g",protein:22},
-  {id:"soy",name:"Soy chunks",emoji:"🌱",unit:"30 g portions",protein:16},
-  {id:"yogurt",name:"Greek yogurt",emoji:"🥛",unit:"cups",protein:17},
-  {id:"whey",name:"Whey protein",emoji:"🥤",unit:"scoops",protein:24}
+/* ProteinTrack: a beginner-friendly, localStorage-based protein tracker.
+   Food values are illustrative estimates. This project is a learning tool, not medical advice. */
+const STORAGE_KEY = "proteinTrackStateV1";
+const ACTIVITY_LABELS = { "1.0":"Low activity", "1.2":"Light activity", "1.5":"Moderate", "1.8":"High activity" };
+const FOOD_DATABASE = [
+  {id:"eggs",name:"Eggs",emoji:"🥚",serving:"1 large egg",protein:6},
+  {id:"paneer",name:"Paneer",emoji:"🧀",serving:"100 g",protein:18},
+  {id:"dal",name:"Dal (cooked)",emoji:"🥣",serving:"1 cup",protein:9},
+  {id:"chicken",name:"Chicken (cooked)",emoji:"🍗",serving:"100 g",protein:31},
+  {id:"milk",name:"Milk",emoji:"🥛",serving:"1 cup",protein:8},
+  {id:"curd",name:"Curd / yogurt",emoji:"🥣",serving:"100 g",protein:4},
+  {id:"tofu",name:"Tofu",emoji:"🧊",serving:"100 g",protein:8},
+  {id:"chickpeas",name:"Chickpeas (cooked)",emoji:"🫘",serving:"1 cup",protein:15},
+  {id:"peanuts",name:"Peanuts",emoji:"🥜",serving:"30 g",protein:7},
+  {id:"oats",name:"Oats (dry)",emoji:"🌾",serving:"40 g",protein:5},
+  {id:"fish",name:"Fish (cooked)",emoji:"🐟",serving:"100 g",protein:22},
+  {id:"soy",name:"Soy chunks (dry)",emoji:"🌱",serving:"30 g",protein:16}
 ];
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
+const todayKey = () => dateKey(new Date());
+function dateKey(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;}
+function dateFromKey(key){const [y,m,d]=key.split("-").map(Number);return new Date(y,m-1,d);}
+function shiftDate(date,days){const result=new Date(date);result.setDate(result.getDate()+days);return result;}
+function shortDate(key){return dateFromKey(key).toLocaleDateString(undefined,{day:"numeric",month:"short"});}
+function longDate(key){return dateFromKey(key).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});}
+function dayName(key){return dateFromKey(key).toLocaleDateString(undefined,{weekday:"short"});}
+function escapeHTML(value){return String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));}
+function round1(number){return Math.round((Number(number)+Number.EPSILON)*10)/10;}
+function defaultState(){return {profile:{name:"",weight:80,activity:"1.5",customGoal:""},entries:[]};}
+function loadState(){try{const parsed=JSON.parse(localStorage.getItem(STORAGE_KEY));if(parsed&&parsed.profile&&Array.isArray(parsed.entries))return parsed;}catch(error){console.warn("Could not read saved tracker data",error);}return defaultState();}
+let state=loadState();
+let toastTimer;
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}
+function calculatedGoal(){const p=state.profile;const multiplier=Number(p.activity)||1.5;return Math.max(1,Math.round(Number(p.weight||80)*multiplier));}
+function dailyGoal(){const custom=Number(state.profile.customGoal);return custom>0?custom:calculatedGoal();}
+function entriesFor(key){return state.entries.filter(entry=>entry.date===key);}
+function totalFor(key){return round1(entriesFor(key).reduce((sum,entry)=>sum+Number(entry.protein||0),0));}
+function showToast(message){const toast=$("#toast");toast.textContent=message;toast.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove("show"),2600);}
+function updateHeader(){const name=state.profile.name.trim();$("#pageTitle").textContent=name?`Good day, ${name}! 👋`:"Good day! 👋";$("#dateChip").textContent=new Date().toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short",year:"numeric"});$("#profileShortcut").textContent=name?name[0].toUpperCase():"P";}
+function renderStats(){const goal=dailyGoal(),total=totalFor(todayKey()),remaining=Math.max(0,round1(goal-total)),percent=Math.min(100,Math.round(total/goal*100));$("#weightStat").textContent=`${state.profile.weight} kg`;$("#activityStat").textContent=ACTIVITY_LABELS[state.profile.activity]||"Moderate";$("#goalStat").textContent=`${goal} g`;$("#intakeStat").textContent=`${total} g`;$("#goalPercent").textContent=`${Math.round(total/goal*100)}% of goal`;$("#consumedText").textContent=`${total} g / ${goal} g`;$("#remainingText").textContent=`${remaining} g`;$("#ringPercent").textContent=`${percent}%`;$("#progressRing").style.setProperty("--progress",`${percent*3.6}deg`);let title="You're off to a start!",message="Log your first food to track your progress today.";if(total>=goal){title="Daily goal reached!";message=`You've logged ${total} g today. Great job tracking consistently.`;}else if(total>0){title="You're making progress!";message=`${remaining} g left to reach your tracker goal today.`;}$("#encourageTitle").textContent=title;$("#encourageText").textContent=message;}
+function renderSelect(){const select=$("#foodSelect");const current=select.value;select.innerHTML=FOOD_DATABASE.map(food=>`<option value="${food.id}">${food.name} — ${food.protein} g (${food.serving})</option>`).join("")+`<option value="custom">Custom food / manual entry</option>`;if(current)select.value=current;if(!select.value)select.value=FOOD_DATABASE[0].id;updateSelectedFood();}
+function updateSelectedFood(){const food=FOOD_DATABASE.find(item=>item.id===$("#foodSelect").value);if(food){$("#proteinInput").value=food.protein;$("#unit").value=food.serving;$("#foodHint").textContent=`Estimated protein per ${food.serving}: ${food.protein} g. Adjust as needed.`;}else{$("#proteinInput").value="";$("#unit").value="serving(s)";$("#foodHint").textContent="Enter the food name, quantity and protein amount in the fields."}}
+function renderQuickFoods(){const quick=FOOD_DATABASE.slice(0,6);$("#quickFoods").innerHTML=quick.map(food=>`<button type="button" class="quick-food" data-quick="${food.id}"><span class="food-emoji">${food.emoji}</span><div><strong>${food.name}</strong><small>${food.protein} g · ${food.serving}</small></div><span class="add-circle">+</span></button>`).join("");}
+function renderTodayLog(){const entries=entriesFor(todayKey()).sort((a,b)=>a.createdAt-b.createdAt);$("#entryCount").textContent=`${entries.length} ${entries.length===1?"entry":"entries"}`;$("#todayEmpty").classList.toggle("hidden",entries.length>0);$("#todayLogBody").innerHTML=entries.map(entry=>`<tr><td>${escapeHTML(entry.time)}</td><td>${escapeHTML(entry.name)}</td><td>${escapeHTML(entry.quantity)} ${escapeHTML(entry.unit)}</td><td><strong>${round1(entry.protein)} g</strong></td><td><div class="action-cell"><button class="icon-btn" data-edit="${entry.id}" aria-label="Edit ${escapeHTML(entry.name)}" title="Edit">✎</button><button class="icon-btn delete-btn" data-delete="${entry.id}" aria-label="Delete ${escapeHTML(entry.name)}" title="Delete">⌫</button></div></td></tr>`).join("");}
+function getLastDays(count){return Array.from({length:count},(_,i)=>dateKey(shiftDate(new Date(),i-(count-1))));}
+function renderWeeklyChart(){const days=getLastDays(7),goal=dailyGoal(),max=Math.max(goal,...days.map(totalFor),1)*1.15;$("#weeklyChart").innerHTML=days.map(key=>{const total=totalFor(key),height=Math.max(2,total/max*100);return `<div class="bar-item"><div class="bar-area"><div class="bar-value">${total} g</div><div class="bar ${key===todayKey()?"today":""}" style="height:${height}%"></div></div><span class="bar-label">${dayName(key)}</span></div>`;}).join("");}
+function renderDashboard(){renderStats();renderTodayLog();renderWeeklyChart();}
+function renderHistory(){const count=Number($("#historyRange").value||7),days=getLastDays(count),goal=dailyGoal(),max=Math.max(goal,...days.map(totalFor),1)*1.15;$("#historyChart").innerHTML=days.map(key=>{const total=totalFor(key);return `<div class="history-bar-item" title="${longDate(key)}: ${total} g"><span class="history-bar-value">${total}</span><div class="history-bar ${total>=goal?"met":""}" style="height:${Math.max(2,total/max*100)}%"></div><span class="history-bar-label">${shortDate(key)}</span></div>`;}).join("");const body=$("#historyBody");const rows=days.slice().reverse().map(key=>{const total=totalFor(key),percent=Math.round(total/goal*100),status=total>=goal?["Met","met"]:total>=goal*.8?["Close","close"]:["Below goal","low"];return `<tr><td>${longDate(key)}</td><td><strong>${total} g</strong></td><td>${goal} g</td><td>${percent}%</td><td><span class="status ${status[1]}">${status[0]}</span></td></tr>`;});body.innerHTML=rows.join("");$("#historyCount").textContent=`${days.length} days`;$("#historyEmpty").classList.add("hidden");}
+function renderFoodDatabase(){const query=$("#foodSearch").value.trim().toLowerCase();const foods=FOOD_DATABASE.filter(food=>food.name.toLowerCase().includes(query));$("#foodDatabase").innerHTML=foods.length?foods.map(food=>`<div class="database-food"><span class="food-emoji">${food.emoji}</span><div><strong>${food.name}</strong><small>${food.protein} g protein · ${food.serving}</small></div><button type="button" data-add-food="${food.id}">＋ Log</button></div>`).join(""):`<p class="no-results">No foods match your search.</p>`;}
+function renderProfile(){const p=state.profile;$("#profileName").value=p.name||"";$("#weight").value=p.weight;$("#activity").value=p.activity;$("#customGoal").value=p.customGoal||"";updateGoalPreview();}
+function updateGoalPreview(){const weight=Number($("#weight").value)||0,activity=$("#activity").value,custom=Number($("#customGoal").value);const goal=custom>0?custom:Math.round(weight*1.5);$("#recommendedGoal").textContent=`${Math.max(0,goal)} g / day`;$("#goalFormula").textContent=custom>0?"Using your manually set target.":`Example rule: ${weight} kg × ${activity} g/kg for ${ACTIVITY_LABELS[activity]||"Moderate"}.`;}
+function renderAll(){updateHeader();renderSelect();renderQuickFoods();renderDashboard();renderHistory();renderFoodDatabase();renderProfile();}
+function showView(view){const views=["dashboard","history","foods","profile"];views.forEach(name=>{$(`#${name}View`).classList.toggle("hidden",name!==view);});$$(".nav-link").forEach(button=>button.classList.toggle("active",button.dataset.view===view));const titles={dashboard:["Good day! 👋","Stay consistent. Small steps make big changes."],history:["Protein History","Review your intake and progress over time."],foods:["Food Database","Explore common foods and their estimated protein values."],profile:["Profile & Goal","Manage your details and daily protein target."]};$("#pageTitle").textContent=state.profile.name&&view==="dashboard"?`Good day, ${state.profile.name}! 👋`:titles[view][0];$("#pageSubtitle").textContent=titles[view][1];}
+function addEntry({name,quantity,unit,protein,foodId=""}){const q=Number(quantity),p=Number(protein);if(!name.trim()||!Number.isFinite(q)||q<=0||!Number.isFinite(p)||p<0){showToast("Please enter a food name, positive quantity and valid protein amount.");return false;}const now=new Date();state.entries.push({id:globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random()}`,date:todayKey(),time:now.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}),createdAt:Date.now(),name:name.trim(),quantity:round1(q),unit:unit.trim()||"serving(s)",protein:round1(p),foodId});saveState();renderDashboard();renderHistory();showToast(`${name.trim()} added to today's log.`);return true;}
+function quickAdd(foodId){const food=FOOD_DATABASE.find(item=>item.id===foodId);if(food)addEntry({name:food.name,quantity:1,unit:food.serving,protein:food.protein,foodId});}
+function editEntry(id){const entry=state.entries.find(item=>item.id===id);if(!entry)return;$("#editId").value=entry.id;$("#editName").value=entry.name;$("#editQuantity").value=entry.quantity;$("#editUnit").value=entry.unit;$("#editProtein").value=entry.protein;$("#editDialog").showModal();}
+function deleteEntry(id){const entry=state.entries.find(item=>item.id===id);if(!entry)return;if(!confirm(`Delete "${entry.name}" from your log?`))return;state.entries=state.entries.filter(item=>item.id!==id);saveState();renderDashboard();renderHistory();showToast("Food entry deleted.");}
+function exportHistory(){const days=getLastDays(Number($("#historyRange").value||7));const rows=[["Date","Food","Quantity","Unit","Protein (g)","Time"]];days.forEach(key=>entriesFor(key).forEach(entry=>rows.push([key,entry.name,entry.quantity,entry.unit,entry.protein,entry.time])));const csv=rows.map(row=>row.map(value=>`"${String(value).replace(/"/g,'""')}"`).join(",")).join("\r\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=`protein-track-${todayKey()}.csv`;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);showToast("CSV export downloaded.");}
 
-// Load saved data or create a new profile.
-function loadData() {
-  try {
-    const data = JSON.parse(localStorage.getItem(KEY));
-    if (data?.profile && Array.isArray(data.entries)) return data;
-  } catch (error) {
-    console.log("Starting fresh.");
-  }
-
-  return {
-    profile: {name:"", weight:80, goal:120},
-    entries: []
-  };
-}
-
-let state = loadData();
-
-const save = () =>
-  localStorage.setItem(KEY, JSON.stringify(state));
-
-const goal = () => Number(state.profile.goal) || 120;
-
-function today() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-
-function dateAgo(days) {
-  const d = new Date();
-  d.setDate(d.getDate()-days);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-}
-
-function totalOn(date) {
-  return state.entries
-    .filter(e => e.date === date)
-    .reduce((sum,e) => sum + Number(e.protein),0);
-}
-
-function notify(message) {
-  $("toast").textContent = message;
-  $("toast").classList.add("show");
-  setTimeout(() => $("toast").classList.remove("show"),2200);
-}
-
-// Fill the food menu and quick-add buttons.
-function renderFoodChoices() {
-  $("foodSelect").innerHTML =
-    foods.map(f => `<option value="${f.id}">${f.emoji} ${f.name} — ${f.protein} g / portion</option>`).join("") +
-    `<option value="custom">＋ Custom food</option>`;
-
-  $("quickFoods").innerHTML = foods.slice(0,6).map(f => `
-    <button class="quick-food" data-quick="${f.id}" type="button">
-      <span class="food-emoji">${f.emoji}</span>
-      <span class="quick-food-copy">
-        <strong>${f.name}</strong>
-        <small>${f.protein} g protein</small>
-      </span>
-      <span class="add-circle">+</span>
-    </button>
-  `).join("");
-
-  updateFoodFields();
-}
-
-function updateFoodFields() {
-  const food = foods.find(f => f.id === $("foodSelect").value);
-
-  $("customFoodFields").classList.toggle("hidden",!!food);
-  $("proteinInput").value = food ? food.protein : "";
-  $("foodHint").textContent = food
-    ? `Estimate: ${food.protein} g per portion.`
-    : "Enter a custom food and its protein amount.";
-
-  updateHint();
-}
-
-function updateHint() {
-  const total = Number($("quantity").value) *
-                Number($("proteinInput").value);
-
-  if ($("proteinInput").value !== "") {
-    $("foodHint").textContent =
-      `This entry adds about ${Math.round(total*10)/10} g protein.`;
-  }
-}
-
-// Add a food and calculate its protein.
-function addFood(name,quantity,unit,proteinEach) {
-  state.entries.push({
-    id: Date.now().toString(),
-    name,
-    quantity,
-    unit,
-    protein: Math.round(quantity*proteinEach*10)/10,
-    date: today(),
-    time: new Date().toLocaleTimeString([], {
-      hour:"2-digit", minute:"2-digit"
-    })
-  });
-
-  save();
-  renderAll();
-  notify(`${name} added to today's log.`);
-}
-
-// Update today's total, progress ring and food list.
-function renderDashboard() {
-  const amount = totalOn(today());
-  const percent = Math.round(amount/goal()*100);
-
-  $("heroIntake").textContent = Math.round(amount*10)/10;
-  $("heroGoal").textContent = goal();
-  $("ringPercent").innerHTML = `${percent}<span>%</span>`;
-
-  $("progressRing").style.setProperty(
-    "--progress", `${Math.min(100,percent)}%`
-  );
-
-  $("heroMeterFill").style.width =
-    `${Math.min(100,percent)}%`;
-
-  $("heroFootnote").textContent = amount >= goal()
-    ? "Daily target reached. Great work!"
-    : `${Math.round((goal()-amount)*10)/10} g left to reach your target`;
-
-  const entries = state.entries
-    .filter(e => e.date === today())
-    .slice().reverse();
-
-  $("entryCount").textContent = `${entries.length} ENTRIES`;
-  $("todayEmpty").classList.toggle("hidden",entries.length > 0);
-
-  $("todayLogBody").innerHTML = entries.map(e => `
-    <tr>
-      <td>${e.name}<small>${e.time || "Today"}</small></td>
-      <td>${e.quantity} ${e.unit}</td>
-      <td><span class="protein-value">${e.protein} g</span></td>
-      <td>
-        <button class="icon-action" data-edit="${e.id}">↗</button>
-        <button class="icon-action delete" data-delete="${e.id}">×</button>
-      </td>
-    </tr>
-  `).join("");
-
-  // Simple seven-day chart.
-  const days = Array.from({length:7},(_,i) => dateAgo(6-i));
-  const totals = days.map(totalOn);
-  const max = Math.max(goal(),...totals,1)*1.15;
-
-  $("weeklyAverage").innerHTML =
-    `${Math.round(totals.reduce((a,b)=>a+b,0)/7)} <small>g</small>`;
-
-  $("weeklyChart").innerHTML = days.map((d,i) => `
-    <div class="week-bar-item">
-      <div class="week-bar-area">
-        <div class="week-bar ${totals[i]>=goal()?"met":""}"
-          style="height:${Math.max(2,totals[i]/max*100)}%">
-        </div>
-      </div>
-      <span class="week-bar-label">
-        ${new Date(d+"T12:00:00").toLocaleDateString(undefined,{weekday:"short"})}
-      </span>
-    </div>
-  `).join("");
-}
-
-// Display searchable foods.
-function renderLibrary() {
-  const query = $("foodSearch").value.toLowerCase();
-
-  $("foodDatabase").innerHTML = foods
-    .filter(f => f.name.toLowerCase().includes(query))
-    .map(f => `
-      <article class="database-food">
-        <span class="food-emoji">${f.emoji}</span>
-        <span class="database-food-copy">
-          <strong>${f.name}</strong>
-          <small>${f.protein} g protein per portion</small>
-        </span>
-        <button data-add-food="${f.id}">＋ LOG</button>
-      </article>
-    `).join("");
-}
-
-// Switch between the website's four sections.
-function showView(name) {
-  ["dashboard","foods","history","profile"].forEach(view =>
-    $(view+"View").classList.toggle("hidden",view!==name)
-  );
-
-  document.querySelectorAll(".nav-link").forEach(button =>
-    button.classList.toggle("active",button.dataset.view===name)
-  );
-
-  const headings = {
-    dashboard:["Build your <em>baseline.</em>","Good habits, one plate at a time."],
-    foods:["Find your <em>fuel.</em>","Explore common protein sources."],
-    history:["See your <em>rhythm.</em>","Track your progress over time."],
-    profile:["Make it <em>yours.</em>","Set your personal target."]
-  };
-
-  $("pageTitle").innerHTML = headings[name][0];
-  $("pageSubtitle").textContent = headings[name][1];
-}
-
-function renderProfile() {
-  $("profileName").value = state.profile.name || "";
-  $("weight").value = state.profile.weight || 80;
-  $("goal").value = goal();
-
-  $("goalFormula").textContent =
-    `${$("weight").value} kg × 1.5 = ${Math.round(Number($("weight").value)*1.5)} g`;
-
-  $("profileShortcut").textContent =
-    state.profile.name ? state.profile.name[0].toUpperCase() : "F";
-}
-
-function renderHistory() {
-  const count = Number($("historyRange").value || 7);
-  const dates = Array.from({length:count},(_,i)=>dateAgo(count-1-i));
-
-  $("historyBody").innerHTML = dates.slice().reverse().map(d => `
-    <tr>
-      <td>${d}</td>
-      <td>${Math.round(totalOn(d))} g</td>
-      <td>${goal()} g</td>
-      <td>${Math.round(totalOn(d)/goal()*100)}%</td>
-      <td>${totalOn(d)>=goal()?"Target met":"In progress"}</td>
-    </tr>
-  `).join("");
-}
-
-function renderAll() {
-  renderDashboard();
-  renderLibrary();
-  renderHistory();
-  renderProfile();
-}
-
-// Log food from the main form.
-$("foodForm").addEventListener("submit",e => {
-  e.preventDefault();
-
-  const food = foods.find(f => f.id === $("foodSelect").value);
-  const custom = !food;
-  const name = custom ? $("customName").value.trim() : food.name;
-  const unit = custom ? $("customUnit").value.trim() : food.unit;
-  const quantity = Number($("quantity").value);
-  const protein = Number($("proteinInput").value);
-
-  if (!name || quantity<=0 || !unit || protein<0) {
-    return notify("Please check your food details.");
-  }
-
-  addFood(name,quantity,unit,protein);
-  $("quantity").value = 1;
-});
-
-$("foodSelect").addEventListener("change",updateFoodFields);
-$("quantity").addEventListener("input",updateHint);
-$("proteinInput").addEventListener("input",updateHint);
-$("foodSearch").addEventListener("input",renderLibrary);
-$("historyRange").addEventListener("change",renderHistory);
-
-$("profileForm").addEventListener("submit",e => {
-  e.preventDefault();
-
-  state.profile = {
-    name:$("profileName").value.trim(),
-    weight:Number($("weight").value),
-    goal:Number($("goal").value)
-  };
-
-  save();
-  renderAll();
-  showView("profile");
-  notify("Settings saved.");
-});
-
-$("profileShortcut").addEventListener("click",() => showView("profile"));
-
-document.addEventListener("click",e => {
-  const nav = e.target.closest("[data-view], [data-go]");
-  if (nav) return showView(nav.dataset.view || nav.dataset.go);
-
-  const button = e.target.closest("[data-quick], [data-add-food]");
-  if (button) {
-    const food = foods.find(f =>
-      f.id === (button.dataset.quick || button.dataset.addFood)
-    );
-    if (food) addFood(food.name,1,food.unit,food.protein);
-  }
-
-  const del = e.target.closest("[data-delete]");
-  if (del && confirm("Delete this food entry?")) {
-    state.entries = state.entries.filter(x=>x.id!==del.dataset.delete);
-    save();
-    renderAll();
-  }
-});
-
-// Start the app.
-renderFoodChoices();
-renderAll();
-showView("dashboard");
+$("#foodSelect").addEventListener("change",updateSelectedFood);
+$("#foodForm").addEventListener("submit",event=>{event.preventDefault();const selected=$("#foodSelect").value;const food=FOOD_DATABASE.find(item=>item.id===selected);const name=food?food.name:(prompt("Enter the name of your custom food:")||"").trim();if(!name)return;const ok=addEntry({name,quantity:$("#quantity").value,unit:$("#unit").value,protein:$("#proteinInput").value,foodId:food?.id||""});if(ok){$("#quantity").value=1;if(selected==="custom")$("#foodSelect").value=FOOD_DATABASE[0].id;updateSelectedFood();}});
+$("#quickFoods").addEventListener("click",event=>{const button=event.target.closest("[data-quick]");if(button)quickAdd(button.dataset.quick);});
+$("#todayLogBody").addEventListener("click",event=>{const edit=event.target.closest("[data-edit]"),del=event.target.closest("[data-delete]");if(edit)editEntry(edit.dataset.edit);if(del)deleteEntry(del.dataset.delete);});
+$("#editForm").addEventListener("submit",event=>{if(event.submitter?.value==="cancel")return;event.preventDefault();const id=$("#editId").value,entry=state.entries.find(item=>item.id===id);if(!entry)return;const quantity=Number($("#editQuantity").value),protein=Number($("#editProtein").value),name=$("#editName").value.trim();if(!name||quantity<=0||protein<0||!Number.isFinite(quantity)||!Number.isFinite(protein)){showToast("Check the food name, quantity and protein amount.");return;}Object.assign(entry,{name,quantity:round1(quantity),unit:$("#editUnit").value.trim()||"serving(s)",protein:round1(protein)});saveState();$("#editDialog").close();renderDashboard();renderHistory();renderFoodDatabase();showToast("Food entry updated.");});
+$("#profileForm").addEventListener("submit",event=>{event.preventDefault();const weight=Number($("#weight").value),custom=$("#customGoal").value.trim();if(!Number.isFinite(weight)||weight<=0||weight>500){showToast("Enter a valid body weight.");return;}if(custom&&(Number(custom)<=0||Number(custom)>1000)){showToast("Enter a valid custom target between 1 and 1000 g.");return;}state.profile={name:$("#profileName").value.trim(),weight,activity:$("#activity").value,customGoal:custom?Number(custom):""};saveState();renderAll();showView("profile");showToast("Profile and daily goal saved.");});
+$("#weight").addEventListener("input",updateGoalPreview);$("#activity").addEventListener("change",updateGoalPreview);$("#customGoal").addEventListener("input",updateGoalPreview);
+$("#historyRange").addEventListener("change",renderHistory);$("#exportCsv").addEventListener("click",exportHistory);$("#foodSearch").addEventListener("input",renderFoodDatabase);
+$("#foodDatabase").addEventListener("click",event=>{const button=event.target.closest("[data-add-food]");if(button){quickAdd(button.dataset.addFood);showView("dashboard");}});
+$$(".nav-link").forEach(button=>button.addEventListener("click",()=>showView(button.dataset.view)));
+$$("[data-go]").forEach(button=>button.addEventListener("click",()=>showView(button.dataset.go)));
+$("#profileShortcut").addEventListener("click",()=>showView("profile"));
+renderAll();showView("dashboard");
