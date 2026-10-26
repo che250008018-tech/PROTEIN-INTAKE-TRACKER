@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f5faf7" />
+  <title>ProteinTrack — Protein Intake Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="ProteinTrack home"><span class="brand-mark">◆</span><span>Protein<span class="green">Track</span></span></a>
+      <nav>
+        <button class="nav-link active" data-view="dashboard"><span>⌂</span> Dashboard</button>
+        <button class="nav-link" data-view="history"><span>▥</span> History</button>
+        <button class="nav-link" data-view="foods"><span>☷</span> Food Database</button>
+        <button class="nav-link" data-view="profile"><span>♙</span> Profile & Goal</button>
+      </nav>
+      <div class="sidebar-note"><span class="note-icon">✦</span><strong>Small steps add up.</strong><p>Track consistently and learn what works for you.</p></div>
+      <p class="sidebar-foot">PROTEINTRACK · PERSONAL TRACKER</p>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div><p class="eyebrow" id="todayLabel">YOUR DAILY OVERVIEW</p><h1 id="pageTitle">Good day! 👋</h1><p class="subtitle" id="pageSubtitle">Stay consistent. Small steps make big changes.</p></div>
+        <div class="topbar-actions"><span class="date-chip" id="dateChip"></span><button class="avatar" id="profileShortcut" title="Open profile">P</button></div>
+      </header>
+
+      <section id="dashboardView" class="view">
+        <div class="stat-grid">
+          <article class="stat-card"><div class="stat-icon blue">⚖</div><div><p>Body weight</p><strong id="weightStat">— kg</strong></div><button class="text-action" data-go="profile">Edit</button></article>
+          <article class="stat-card"><div class="stat-icon purple">↗</div><div><p>Activity level</p><strong id="activityStat">Moderate</strong></div><button class="text-action" data-go="profile">Edit</button></article>
+          <article class="stat-card"><div class="stat-icon green-bg">◎</div><div><p>Daily protein goal</p><strong id="goalStat">120 g</strong></div><button class="text-action" data-go="profile">Edit</button></article>
+          <article class="stat-card"><div class="stat-icon green-bg">▥</div><div><p>Today's intake</p><strong id="intakeStat">0 g</strong><small id="goalPercent">0% of goal</small></div></article>
+        </div>
+
+        <div class="dashboard-grid">
+          <article class="card progress-card">
+            <div class="section-heading"><span class="heading-icon">◉</span><h2>Today's Progress</h2></div>
+            <div class="progress-content"><div class="ring" id="progressRing"><div><strong id="ringPercent">0%</strong><span>completed</span></div></div><div class="progress-numbers"><p><strong id="consumedText">0 g / 120 g</strong><span>Protein consumed</span></p><p><strong id="remainingText">120 g</strong><span>Remaining to goal</span></p></div></div>
+            <div class="encouragement"><span>✦</span><div><strong id="encourageTitle">You're off to a start!</strong><p id="encourageText">Log your first food to track your progress today.</p></div></div>
+          </article>
+
+          <article class="card log-card">
+            <div class="section-heading"><span class="heading-icon">＋</span><h2>Log Food</h2></div>
+            <form id="foodForm">
+              <label for="foodSelect">Food item</label>
+              <select id="foodSelect"></select>
+              <div class="form-row"><div><label for="quantity">Quantity</label><input id="quantity" type="number" min="0.1" step="0.1" value="1" required /></div><div><label for="unit">Unit</label><input id="unit" value="serving(s)" maxlength="20" /></div><div><label for="proteinInput">Protein (g)</label><input id="proteinInput" type="number" min="0" step="0.1" required /></div></div>
+              <p class="form-help" id="foodHint">Choose a food to prefill its estimated protein value.</p>
+              <button class="primary-btn full-width" type="submit"><span>＋</span> Add food entry</button>
+            </form>
+          </article>
+
+          <article class="card quick-card">
+            <div class="section-heading"><span class="heading-icon">✿</span><h2>Quick Add</h2><button class="text-action" data-go="foods">View all</button></div>
+            <div class="quick-foods" id="quickFoods"></div>
+          </article>
+
+          <article class="card log-table-card">
+            <div class="section-heading"><span class="heading-icon">▤</span><h2>Today's Food Log</h2><span class="count-pill" id="entryCount">0 entries</span></div>
+            <div class="table-wrap"><table><thead><tr><th>Time</th><th>Food item</th><th>Quantity</th><th>Protein</th><th>Actions</th></tr></thead><tbody id="todayLogBody"></tbody></table></div>
+            <p class="empty-state" id="todayEmpty">No food logged yet. Add your first entry above.</p>
+          </article>
+
+          <article class="card chart-card">
+            <div class="section-heading"><span class="heading-icon">▥</span><h2>Weekly Protein Intake</h2><button class="text-action" data-go="history">View history</button></div>
+            <div id="weeklyChart" class="bar-chart" aria-label="Protein intake over the last seven days"></div>
+            <div class="chart-legend"><span class="legend-dot"></span> Protein intake (g) <span class="legend-line"></span> Daily goal</div>
+          </article>
+        </div>
+      </section>
+
+      <section id="historyView" class="view hidden">
+        <div class="history-controls card"><div><h2>Intake over time</h2><p>Review your daily protein and compare it with your goal.</p></div><div class="control-actions"><select id="historyRange" aria-label="History range"><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select><button class="secondary-btn" id="exportCsv">Export CSV</button></div></div>
+        <article class="card history-chart-card"><div class="section-heading"><h2>Daily protein intake</h2><span class="muted">Values are based on your logged entries</span></div><div id="historyChart" class="history-chart"></div></article>
+        <article class="card history-table-card"><div class="section-heading"><h2>Daily history</h2><span class="count-pill" id="historyCount">0 days</span></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Protein consumed</th><th>Goal</th><th>Progress</th><th>Status</th></tr></thead><tbody id="historyBody"></tbody></table></div><p class="empty-state hidden" id="historyEmpty">Your daily history will appear here as you log food.</p></article>
+      </section>
+
+      <section id="foodsView" class="view hidden">
+        <article class="card"><div class="section-heading"><div><h2>Common Food Database</h2><p class="subtitle">Approximate protein values to make logging faster.</p></div><input id="foodSearch" class="search-input" placeholder="Search foods..." aria-label="Search foods" /></div><div id="foodDatabase" class="food-database"></div><p class="fine-print">Nutrition values vary by brand, serving size and preparation. Use product labels or a trusted nutrition source for more accurate tracking.</p></article>
+      </section>
+
+      <section id="profileView" class="view hidden">
+        <article class="card profile-card"><div class="section-heading"><div><h2>Your Profile & Daily Goal</h2><p class="subtitle">Set your details and choose a target that suits your needs.</p></div></div>
+          <form id="profileForm" class="profile-form">
+            <div class="profile-fields"><div><label for="profileName">Name (optional)</label><input id="profileName" placeholder="What should we call you?" maxlength="40" /></div><div><label for="weight">Body weight (kg)</label><input id="weight" type="number" min="1" max="500" step="0.1" required /></div><div><label for="activity">Activity level</label><select id="activity"><option value="1.0">Low activity</option><option value="1.2">Light activity</option><option value="1.5">Moderate activity</option><option value="1.8">High activity</option></select></div><div><label for="customGoal">Custom daily goal (g, optional)</label><input id="customGoal" type="number" min="1" max="1000" step="1" placeholder="Leave blank to calculate" /></div></div>
+            <div class="goal-preview"><span class="stat-icon green-bg">◎</span><div><p>Suggested tracker target</p><strong id="recommendedGoal">120 g / day</strong><small id="goalFormula">Calculated using the current example rule.</small></div></div>
+            <button class="primary-btn" type="submit">Save profile & goal</button><p class="fine-print">For this learning project, the default estimate is 1.5 g of protein per kg of body weight. This is a configurable tracking rule, not medical advice or a personalised nutrition recommendation. Consult a qualified professional for individual dietary needs.</p>
+          </form>
+        </article>
+      </section>
+
+      <footer class="footer">Made for consistent tracking <span>•</span> Your data stays in this browser</footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="editDialog"><form method="dialog" id="editForm" class="edit-form"><div class="section-heading"><h2>Edit food entry</h2><button class="icon-btn" value="cancel" aria-label="Close">×</button></div><input type="hidden" id="editId" /><label for="editName">Food name</label><input id="editName" required maxlength="80" /><div class="form-row"><div><label for="editQuantity">Quantity</label><input id="editQuantity" type="number" min="0.1" step="0.1" required /></div><div><label for="editUnit">Unit</label><input id="editUnit" maxlength="20" required /></div><div><label for="editProtein">Protein (g)</label><input id="editProtein" type="number" min="0" step="0.1" required /></div></div><div class="dialog-actions"><button class="secondary-btn" value="cancel">Cancel</button><button class="primary-btn" id="saveEdit" value="save">Save changes</button></div></form></dialog>
+  <script src="script.js"></script>
+</body>
+</html>
